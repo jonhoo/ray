@@ -1,0 +1,53 @@
+# Generates the depedencies needed by bindgen.
+genrule(
+    name = "ray_sys_bindgen",
+    srcs = [
+        "sys/wrapper.h",
+        "//:core_worker_lib",
+    ],
+    outs = ["sys/src/bindings.rs"],
+    # we need to manually re-construct Bazel's header includes here :(
+    cmd = """
+        echo $$(pwd)
+        #env RUST_LOG=bindgen RUST_BACKTRACE=1 bindgen
+        env RUST_BACKTRACE=1 bindgen \
+                $(location sys/wrapper.h) \
+                -o $(location sys/src/bindings.rs) \
+                --enable-cxx-namespaces \
+                --opaque-type=string_view \
+                '--opaque-type=std::.*' \
+                -- \
+                --std=c++11 \
+                -x c++ \
+                -Isrc/ \
+                -Iexternal/plasma/cpp/src/ \
+                -Iexternal/boost/ \
+                -Iexternal/com_github_grpc_grpc/include/ \
+                -Iexternal/com_github_google_flatbuffers/include/ \
+                -Iexternal/com_google_absl/ \
+                -Iexternal/boringssl/src/third_party/googletest/include/ \
+                -Iexternal/com_google_protobuf/src/ \
+                -Ibazel-out/k8-opt/bin/src/ \
+                -Ibazel-out/k8-opt/bin/ \
+                -Isrc/ray/thirdparty/ae/
+    """,
+    local = 1,
+)
+
+genrule(
+    name = "ray_sys",
+    srcs = [
+        "sys/Cargo.toml",
+        "sys/src/lib.rs",
+        ":ray_sys_bindgen",
+        "//:core_worker_lib",
+    ],
+    outs = ["sys/Cargo.lock"],
+    cmd = """
+        echo $$(pwd)
+        cd sys && cargo check
+    """,
+    local = 1,
+)
+
+# vim: set ts=4:sw=4:expandtab:
